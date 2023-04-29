@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/llir/llvm/ir"
+	"github.com/llir/llvm/ir/constant"
 	"github.com/llir/llvm/ir/types"
+	"github.com/llir/llvm/ir/value"
 	"niavka/parser"
 	"os"
 	"strconv"
@@ -122,7 +124,8 @@ func (v *NiavkaVisitor) VisitNumber(ctx *parser.NumberContext) parser.NumberNode
 }
 
 func (v *NiavkaVisitor) VisitString(ctx *parser.StringContext) parser.StringNode {
-	return parser.StringNode{Value: ctx.GetText()}
+	text := ctx.GetText()
+	return parser.StringNode{Value: text[1 : len(text)-1]}
 }
 
 func (v *NiavkaVisitor) VisitId(ctx *parser.IdContext) interface{} {
@@ -141,8 +144,6 @@ func (v *NiavkaVisitor) VisitCall(ctx *parser.CallContext) parser.CallNode {
 	argsContext := ctx.GetC_args()
 	if argsContext != nil {
 		args = v.VisitArgs(argsContext)
-	} else {
-		args = []interface{}{}
 	}
 	return parser.CallNode{
 		Value: v.Visit(ctx.GetC_value()),
@@ -193,19 +194,25 @@ func (v *NiavkaVisitor) VisitType_value(ctx parser.IType_valueContext) string {
 func (v *NiavkaVisitor) VisitArgs(ctx parser.IArgsContext) []interface{} {
 	var args []interface{}
 	for _, arg := range ctx.AllArg() {
-		args = append(args, v.Visit(arg))
+		a := v.Visit(arg)
+		if a != nil {
+			args = append(args, a)
+		}
 	}
 	return args
 }
 
 func (v *NiavkaVisitor) VisitArg(ctx parser.IArgContext) interface{} {
-	return v.Visit(ctx.GetChild(0))
+	return v.Visit(ctx.GetA_value())
 }
 
 func (v *NiavkaVisitor) VisitParams(ctx parser.IParamsContext) []parser.ParamNode {
 	var params []parser.ParamNode
 	for _, param := range ctx.AllParam() {
-		params = append(params, v.Visit(param).(parser.ParamNode))
+		p := v.Visit(param)
+		if p != nil {
+			params = append(params, p.(parser.ParamNode))
+		}
 	}
 	return params
 }
@@ -220,7 +227,10 @@ func (v *NiavkaVisitor) VisitParam(ctx parser.IParamContext) interface{} {
 func (v *NiavkaVisitor) VisitBody(ctx parser.IBodyContext) []interface{} {
 	var body []interface{}
 	for _, element := range ctx.AllBody_element() {
-		body = append(body, v.Visit(element))
+		el := v.Visit(element)
+		if el != nil {
+			body = append(body, el)
+		}
 	}
 	return body
 }
@@ -230,9 +240,13 @@ func (v *NiavkaVisitor) VisitBody_element(ctx parser.IBody_elementContext) inter
 }
 
 func getTypeByName(name string) types.Type {
-	if name == "ціле" {
+	if name == "ц32" {
+		return types.I32
+	} else if name == "ц64" {
 		return types.I64
-	} else if name == "дійсне" {
+	} else if name == "д32" {
+		return types.Float
+	} else if name == "д64" {
 		return types.Double
 	} else if name == "текст" {
 		return types.NewPointer(types.I8)
@@ -262,7 +276,19 @@ func compileCall(block *ir.Block, call parser.CallNode) {
 			funcToCall = element
 		}
 	}
-	block.NewCall(funcToCall)
+	var args []value.Value
+	for _, arg := range call.Args {
+		switch arg.(type) {
+		case parser.StringNode:
+			stringNode := arg.(parser.StringNode)
+			hello := constant.NewCharArrayFromString(stringNode.Value + "\x00")
+			str := block.Parent.Parent.NewGlobalDef("str", hello)
+			zero := constant.NewInt(types.I64, 0)
+			gep := constant.NewGetElementPtr(hello.Typ, str, zero, zero)
+			args = append(args, gep)
+		}
+	}
+	block.NewCall(funcToCall, args...)
 }
 
 func main() {
@@ -276,7 +302,7 @@ func main() {
 	var result = visitor.Visit(tree).(parser.ProgramNode)
 
 	m := ir.NewModule()
-	m.NewFunc("друк", types.I32, ir.NewParam("", types.NewPointer(types.I8)))
+	m.NewFunc("puts", types.I32, ir.NewParam("", types.NewPointer(types.I8)))
 
 	for _, element := range result.Elements {
 		switch element.(type) {
@@ -286,7 +312,11 @@ func main() {
 			for _, param := range diia.Params {
 				diiaFuncParams = append(diiaFuncParams, ir.NewParam(param.Name, getTypeByName(param.Type)))
 			}
-			diiaFunc := m.NewFunc(diia.Name, getTypeByName(diia.ReturnType), diiaFuncParams...)
+			name := diia.Name
+			if name == "запуск" {
+				name = "main"
+			}
+			diiaFunc := m.NewFunc(name, getTypeByName(diia.ReturnType), diiaFuncParams...)
 			diiaFuncBlock := diiaFunc.NewBlock("")
 			compileBody(diiaFuncBlock, diia.Body)
 			diiaFuncBlock.NewRet(nil)

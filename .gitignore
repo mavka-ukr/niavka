@@ -1,5 +1,6 @@
 .idea/
 gen/
 
-hello.ll
-hello
+привіт.ll
+привіт.o
+привіт
