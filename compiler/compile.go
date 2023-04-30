@@ -28,7 +28,7 @@ func getTypeByName(name string) types.Type {
 	case "логічне":
 		return types.I1
 	case "текст":
-		return types.I8Ptr
+		return types.I8Ptr // types.NewStruct(types.I8Ptr, types.NewPointer(types.Void))
 	case "ніщо":
 		return types.Void
 	default:
