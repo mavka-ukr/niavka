@@ -36,23 +36,11 @@ func getTypeByName(name string) types.Type {
 	}
 }
 
-func compileBody(block *ir.Block, body []interface{}) {
-	for _, element := range body {
-		switch element := element.(type) {
-		case parser.AssignNode:
-			panic("not implemented")
-		case parser.CallNode:
-			compileCall(block, element)
-		}
-	}
-}
-
-func compileCall(block *ir.Block, call parser.CallNode) {
-	var funcToCall *ir.Func
-	for _, element := range block.Parent.Parent.Funcs {
-		if element.Name() == call.Value.(parser.IdentifierNode).Name {
-			funcToCall = element
-		}
+func compileCall(call *parser.CallNode, scope *Scope, block *ir.Block) {
+	name := call.Value.(parser.IdentifierNode).Name
+	var funcVariable = scope.Get(name)
+	if funcVariable == nil {
+		panic(name + " is not defined")
 	}
 	var args []value.Value
 	for _, arg := range call.Args {
@@ -65,28 +53,64 @@ func compileCall(block *ir.Block, call parser.CallNode) {
 			args = append(args, gep)
 		}
 	}
-	block.NewCall(funcToCall, args...)
+	block.NewCall(funcVariable.Func, args...)
+}
+
+func compileBody(body []interface{}, scope *Scope, block *ir.Block) {
+	for _, element := range body {
+		switch el := element.(type) {
+		case parser.AssignNode:
+			panic("not implemented")
+		case parser.CallNode:
+			compileCall(&el, scope, block)
+		}
+	}
+}
+
+func compileDiia(diia *parser.DiiaNode, scope *Scope, m *ir.Module) {
+	var diiaFuncParams []*ir.Param
+	for _, param := range diia.Params {
+		diiaFuncParams = append(diiaFuncParams, ir.NewParam(param.Name, getTypeByName(param.Type)))
+	}
+
+	name := diia.Name
+	if name == "запуск" {
+		name = "main"
+	}
+
+	diiaFunc := m.NewFunc(name, getTypeByName(diia.ReturnType), diiaFuncParams...)
+
+	diiaFuncBlock := diiaFunc.NewBlock("")
+	compileBody(diia.Body, scope, diiaFuncBlock)
+
+	diiaFuncBlock.NewRet(nil)
+
+	scope.Set(name, Variable{
+		Name: name,
+		Type: diia.ReturnType,
+		Func: diiaFunc,
+	})
 }
 
 func CompileProgramNode(program parser.ProgramNode) *ir.Module {
 	m := ir.NewModule()
-	m.NewFunc("puts", types.I32, ir.NewParam("", types.NewPointer(types.I8)))
+	puts := m.NewFunc("puts", types.I32, ir.NewParam("", types.NewPointer(types.I8)))
+
+	scope := &Scope{
+		Parent: nil,
+		Vars:   make(map[string]Variable),
+	}
+
+	scope.Set("друк", Variable{
+		Name: "друк",
+		Type: "Дія",
+		Func: puts,
+	})
 
 	for _, element := range program.Elements {
 		switch diia := element.(type) {
 		case parser.DiiaNode:
-			var diiaFuncParams []*ir.Param
-			for _, param := range diia.Params {
-				diiaFuncParams = append(diiaFuncParams, ir.NewParam(param.Name, getTypeByName(param.Type)))
-			}
-			name := diia.Name
-			if name == "запуск" {
-				name = "main"
-			}
-			diiaFunc := m.NewFunc(name, getTypeByName(diia.ReturnType), diiaFuncParams...)
-			diiaFuncBlock := diiaFunc.NewBlock("")
-			compileBody(diiaFuncBlock, diia.Body)
-			diiaFuncBlock.NewRet(nil)
+			compileDiia(&diia, scope, m)
 		}
 	}
 
