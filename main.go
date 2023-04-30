@@ -2,13 +2,19 @@ package main
 
 import (
 	"fmt"
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"niavka/compiler"
 	"niavka/parser"
 	"os"
+
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 )
 
 func main() {
+	if len(os.Args) < 2 {
+		fmt.Println("Usage: niavka <filename>")
+		os.Exit(1)
+	}
+
 	input, _ := antlr.NewFileStream(os.Args[1])
 	lexer := parser.NewNiavkaLexer(input)
 	stream := antlr.NewCommonTokenStream(lexer, 0)
