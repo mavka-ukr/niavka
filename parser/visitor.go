@@ -166,7 +166,7 @@ func (v *NiavkaVisitor) VisitArithmetic_add(ctx *Arithmetic_addContext) Arithmet
 
 func (v *NiavkaVisitor) VisitAssign(ctx IAssignContext) AssignNode {
 	return AssignNode{
-		Left:  v.Visit(ctx.GetA_left()),
+		Left:  v.Visit(ctx.GetA_left()).(IdentifierNode),
 		Type:  v.VisitType_value(ctx.GetA_type()),
 		Value: v.Visit(ctx.GetA_value()),
 	}

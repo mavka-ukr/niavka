@@ -15,7 +15,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	input, _ := antlr.NewFileStream(os.Args[1])
+	input, err := antlr.NewFileStream(os.Args[1])
+	if err != nil {
+		panic(err)
+	}
 	lexer := parser.NewNiavkaLexer(input)
 	stream := antlr.NewCommonTokenStream(lexer, 0)
 	p := parser.NewNiavkaParser(stream)
@@ -24,7 +27,9 @@ func main() {
 	visitor := parser.NiavkaVisitor{}
 	programNode := visitor.Visit(tree).(parser.ProgramNode)
 
-	m := compiler.CompileProgramNode(programNode)
-
+	m, err := compiler.CompileProgramNode(programNode)
+	if err != nil {
+		panic(err)
+	}
 	fmt.Println(m)
 }

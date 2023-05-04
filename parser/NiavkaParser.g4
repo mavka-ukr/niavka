@@ -11,12 +11,12 @@ program_element: diia | value | assign | nls;
 
 diia: 'дія' d_name=identifier '(' ( nls d_params=params? nls ) ')' (d_type=type_value)? nl (d_body=body nl)? nls 'кінець';
 
-value: NUMBER #number
-     | STRING #string
-     | identifier #id
-     | c_left=value '.' c_right=identifier #chain
-     | c_value=value '(' c_args=args? ')' #call
-     | '(' n_value=value ')' #nested
+value: NUMBER                                                   #number
+     | STRING                                                   #string
+     | identifier                                               #id
+     | c_left=value '.' c_right=identifier                      #chain
+     | c_value=value '(' c_args=args? ')'                       #call
+     | '(' n_value=value ')'                                    #nested
      | a_left=value a_operation=arithmetic_op_mul a_right=value #arithmetic_mul
      | a_left=value a_operation=arithmetic_op_add a_right=value #arithmetic_add
      ;

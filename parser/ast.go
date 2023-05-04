@@ -40,7 +40,7 @@ type ArithmeticNode struct {
 }
 
 type AssignNode struct {
-	Left  interface{}
+	Left  IdentifierNode
 	Type  string
 	Value interface{}
 }
